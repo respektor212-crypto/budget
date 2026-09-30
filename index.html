@@ -1,0 +1,1040 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0e1014">
+<meta name="color-scheme" content="dark">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Бюджет">
+<meta name="format-detection" content="telephone=no">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" type="image/png" href="icon-180.png">
+<title>Бюджет</title>
+<style>
+  :root {
+    --bg: #0e1014;
+    --card: #171a20;
+    --card2: #22262e;
+    --line: #2a2f38;
+    --text: #f2f4f7;
+    --muted: #8c93a0;
+    --green: #32d74b;
+    --red: #ff5a4f;
+    --blue: #0a84ff;
+    --orange: #ff9f0a;
+    --st: env(safe-area-inset-top, 0px);
+    --sb: env(safe-area-inset-bottom, 0px);
+    --sl: env(safe-area-inset-left, 0px);
+    --sr: env(safe-area-inset-right, 0px);
+    --bar-pad: max(12px, var(--sb));
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html { background: var(--bg); -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text); overflow-x: hidden;
+    font: 17px/1.35 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  :where(button, label.btn-row, label.btn-link) {
+    font: inherit; color: inherit; background: none; border: 0; padding: 0; margin: 0; cursor: pointer;
+    touch-action: manipulation; -webkit-user-select: none; user-select: none; -webkit-touch-callout: none;
+  }
+  input { font: inherit; color: inherit; }
+  h1, h2, h3, p { margin: 0; }
+  .vh { position: fixed; top: 0; left: 0; width: 1px; height: 1px; opacity: 0; overflow: hidden; pointer-events: none; }
+
+  /* Подложка под статус-бар (часы, вырез), чтобы контент не просвечивал при прокрутке */
+  .sb-bg { position: fixed; top: 0; left: 0; right: 0; height: var(--st); background: var(--bg); z-index: 50; }
+  .testbar {
+    position: fixed; top: calc(var(--st) + 4px); left: 50%; transform: translateX(-50%); z-index: 60;
+    background: var(--orange); color: #000; font-size: 12px; font-weight: 700; padding: 3px 10px; border-radius: 10px;
+    pointer-events: none; white-space: nowrap;
+  }
+
+  .screen {
+    display: none; max-width: 600px; margin: 0 auto; min-height: 100vh;
+    padding: calc(var(--st) + 8px) calc(var(--sr) + 16px) calc(var(--sb) + 32px) calc(var(--sl) + 16px);
+  }
+  .screen.active { display: block; }
+  body.test .screen { padding-top: calc(var(--st) + 30px); }
+  #s-main { padding-bottom: calc(var(--bar-pad) + 110px); }
+
+  /* Шапка */
+  .top { display: flex; align-items: center; gap: 6px; min-height: 54px; margin-bottom: 10px; }
+  .top h1 { flex: 1; min-width: 0; font-size: 26px; font-weight: 750; letter-spacing: -.02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #mainTitle { font-size: 22px; }
+  .back { width: 44px; height: 44px; margin-left: -10px; display: grid; place-items: center; border-radius: 12px; color: var(--blue); flex: none; }
+  .tools { display: flex; gap: 2px; margin-right: -6px; }
+  .tool { display: flex; flex-direction: column; align-items: center; gap: 3px; min-width: 58px; padding: 6px 2px 4px; border-radius: 12px; color: var(--muted); font-size: 11px; }
+  .tool svg { width: 24px; height: 24px; color: var(--text); }
+  .back:active, .tool:active, .ib:active { background: var(--card2); }
+
+  /* Карточки */
+  .card { display: block; width: 100%; text-align: left; background: var(--card); border-radius: 18px; padding: 14px 16px; margin-bottom: 12px; }
+  .card.result:active { background: var(--card2); }
+  .card.result > span { display: block; }
+  .res-label { color: var(--muted); font-size: 14px; }
+  .res-value { font-size: 28px; font-weight: 750; letter-spacing: -.02em; margin: 2px 0 8px; }
+  .res-sub { display: flex !important; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; font-size: 15px; color: var(--muted); }
+  .res-sub b { font-weight: 600; }
+  .more { color: var(--blue); font-size: 15px; margin-top: 10px; }
+  .pos { color: var(--green); }
+  .neg { color: var(--red); }
+
+  .bal-row { display: flex; align-items: center; gap: 12px; padding: 9px 0; }
+  .bal-row + .bal-row { border-top: 1px solid var(--line); }
+  .bal-name { flex: 1; min-width: 0; }
+  .bal-val { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .bal-row.total .bal-name { color: var(--muted); padding-left: 44px; }
+
+  .badge { flex: none; width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; font-weight: 800; font-size: 15px; }
+  .badge.sber { background: #21a038; color: #fff; }
+  .badge.tbank { background: #ffdd2d; color: #111; }
+  .badge.raif { background: #151515; color: #fee600; box-shadow: inset 0 0 0 2px #fee600; }
+  .badge.tr { background: var(--card2); color: var(--blue); font-size: 18px; }
+
+  .sect { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 22px 4px 8px; }
+
+  /* Списки */
+  .list { background: var(--card); border-radius: 18px; overflow: hidden; }
+  .op { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 16px; text-align: left; }
+  .op + .op { border-top: 1px solid var(--line); }
+  .op:active { background: var(--card2); }
+  .op-main { flex: 1; min-width: 0; }
+  .op-title, .op-sub { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .op-sub { font-size: 14px; color: var(--muted); margin-top: 1px; }
+  .op-sub.wrap { white-space: normal; }
+  .op-amt { font-weight: 650; white-space: nowrap; font-variant-numeric: tabular-nums; }
+  .op-amt.tr { color: var(--muted); }
+  .chev { color: var(--muted); font-size: 22px; line-height: 1; margin-left: 2px; }
+  .empty { color: var(--muted); text-align: center; padding: 28px 16px; font-size: 16px; }
+
+  /* Нижняя панель действий */
+  .actionbar {
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 40;
+    display: grid; grid-template-columns: 1fr 1fr 70px; gap: 10px;
+    padding: 12px calc(var(--sr) + 16px) var(--bar-pad) calc(var(--sl) + 16px);
+    background: rgba(14, 16, 20, .88); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+    border-top: 1px solid var(--line);
+  }
+  .btn-big { height: 62px; border-radius: 16px; font-size: 21px; font-weight: 700; color: #fff; }
+  .btn-big.exp { background: #e5433a; }
+  .btn-big.inc { background: #1f9d4c; }
+  .btn-tr { height: 62px; border-radius: 16px; background: var(--card2); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 11px; color: var(--muted); }
+  .btn-tr b { font-size: 22px; line-height: 1; color: var(--text); font-weight: 600; }
+  .btn-big:active, .btn-tr:active, .btn-primary:active, .chip:active, .cardbtn:active, .btn-row:active, .btn-danger:active { filter: brightness(.85); transform: scale(.98); }
+
+  /* Формы */
+  .amount-box { display: flex; align-items: baseline; gap: 8px; background: var(--card); border: 2px solid transparent; border-radius: 18px; padding: 12px 18px; margin-bottom: 10px; }
+  .amount-box:focus-within { border-color: var(--blue); }
+  .amount { flex: 1; min-width: 0; width: 100%; padding: 0; background: none; border: 0; outline: 0; font-size: 40px; font-weight: 700; letter-spacing: -.02em; caret-color: var(--blue); }
+  .amount::placeholder, .field input::placeholder { color: #4a505b; }
+  .cur { font-size: 30px; font-weight: 700; color: var(--muted); }
+  .row-date { display: flex; align-items: center; justify-content: space-between; gap: 12px; background: var(--card); border-radius: 14px; padding: 6px 8px 6px 16px; }
+  .row-date input {
+    -webkit-appearance: none; appearance: none; min-width: 150px; min-height: 40px; padding: 8px 12px;
+    background: var(--card2); border: 0; border-radius: 10px; font-size: 17px; text-align: right;
+  }
+  .row-date input::-webkit-date-and-time-value { text-align: right; }
+  .lbl { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 18px 4px 8px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chip { min-height: 42px; padding: 9px 15px; border-radius: 21px; background: var(--card2); font-size: 16px; }
+  .chip.sel { background: var(--blue); color: #fff; }
+  .cards3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+  .cardbtn { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 11px 4px; border-radius: 16px; background: var(--card); border: 2px solid transparent; font-size: 15px; }
+  .cardbtn.sel { border-color: var(--blue); background: #102338; }
+  .cardbtn:disabled { opacity: .3; }
+  .err { min-height: 22px; margin: 12px 4px 4px; color: var(--red); font-size: 15px; }
+  .btn-primary { display: block; width: 100%; height: 56px; border-radius: 16px; background: var(--blue); color: #fff; font-size: 18px; font-weight: 700; }
+  .btn-del { display: block; width: 100%; height: 52px; margin-top: 10px; border-radius: 14px; color: var(--red); font-size: 17px; font-weight: 600; }
+  .btn-del:active { background: rgba(255, 90, 79, .12); }
+  .btn-link { display: block; width: max-content; margin: 18px auto 0; padding: 10px; color: var(--blue); font-size: 16px; }
+
+  /* Экран стартовых балансов */
+  .lead { color: #c9ced6; margin: 0 4px 16px; font-size: 16px; }
+  .hint { color: var(--muted); font-size: 14px; margin: 8px 4px 0; }
+  .field { display: flex; align-items: center; gap: 12px; background: var(--card); border: 2px solid transparent; border-radius: 16px; padding: 8px 14px; margin-bottom: 10px; }
+  .field:focus-within { border-color: var(--blue); }
+  .field .fname { width: 70px; font-weight: 600; flex: none; }
+  .field input { flex: 1; min-width: 0; padding: 8px 0; background: none; border: 0; outline: 0; font-size: 22px; font-weight: 650; text-align: right; }
+  .field .cur { font-size: 20px; }
+
+  /* Итоги */
+  .stat { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; }
+  .stat + .stat { border-top: 1px solid var(--line); }
+  .stat b { font-weight: 650; font-variant-numeric: tabular-nums; }
+  .catrow { padding: 11px 0; }
+  .catrow + .catrow { border-top: 1px solid var(--line); }
+  .catline { display: flex; align-items: baseline; gap: 10px; }
+  .catline .n { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .catline b { font-weight: 650; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .catline .p { width: 42px; text-align: right; color: var(--muted); font-size: 14px; flex: none; }
+  .bar { height: 8px; margin-top: 8px; background: var(--card2); border-radius: 4px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--orange); border-radius: 4px; }
+
+  /* Настройки */
+  .cat-row { display: flex; align-items: center; gap: 2px; min-height: 52px; padding: 4px 4px 4px 16px; }
+  .cat-row + .cat-row { border-top: 1px solid var(--line); }
+  .cat-row .n { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+  .cat-row .note { color: var(--muted); font-size: 14px; padding-right: 12px; }
+  .ib { width: 44px; height: 44px; flex: none; display: grid; place-items: center; border-radius: 12px; color: var(--muted); }
+  .ib:disabled { opacity: .2; }
+  .ib.del { color: var(--red); }
+  .add-row { display: flex; gap: 8px; margin-top: 10px; }
+  .add-row input { flex: 1; min-width: 0; height: 50px; padding: 0 16px; background: var(--card); border: 2px solid transparent; border-radius: 14px; outline: 0; font-size: 17px; }
+  .add-row input:focus { border-color: var(--blue); }
+  .add-row button { height: 50px; padding: 0 18px; border-radius: 14px; background: var(--blue); color: #fff; font-weight: 600; }
+  .btn-row { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 54px; padding: 0 16px; margin-bottom: 8px; background: var(--card); border-radius: 14px; font-size: 17px; text-align: left; }
+  .btn-danger { display: block; width: 100%; height: 54px; border-radius: 14px; background: rgba(255, 90, 79, .14); color: var(--red); font-size: 17px; font-weight: 650; }
+  .ver { color: #4f5561; font-size: 13px; text-align: center; margin-top: 28px; }
+
+  /* Диалог и уведомление */
+  .dlg { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(0, 0, 0, .6); }
+  .dlg[hidden] { display: none; }
+  .dlg-box { width: 100%; max-width: 340px; padding: 20px; background: #1f232a; border-radius: 20px; }
+  .dlg-box h3 { font-size: 19px; margin-bottom: 8px; }
+  .dlg-box p { color: #c3c8d0; font-size: 16px; margin-bottom: 18px; white-space: pre-line; }
+  .dlg-btns { display: flex; gap: 10px; }
+  .dlg-btns button { flex: 1; height: 50px; border-radius: 14px; background: var(--card2); font-size: 17px; font-weight: 600; }
+  .dlg-btns .ok { background: var(--blue); color: #fff; }
+  .dlg-btns .ok.danger { background: #e5433a; }
+  .toast {
+    position: fixed; left: 50%; bottom: calc(var(--bar-pad) + 92px); z-index: 90;
+    transform: translate(-50%, 16px); opacity: 0; transition: opacity .2s, transform .2s; pointer-events: none;
+    background: #2c313a; padding: 10px 18px; border-radius: 20px; font-size: 15px; white-space: nowrap;
+  }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+</style>
+</head>
+<body>
+<div class="sb-bg"></div>
+<div class="testbar" id="testbar" hidden></div>
+
+<!-- Баланс на 1 число (заполняется из JS) -->
+<section class="screen" id="s-start"></section>
+
+<!-- Главный экран -->
+<section class="screen" id="s-main">
+  <header class="top">
+    <h1 id="mainTitle"></h1>
+    <nav class="tools">
+      <button class="tool" data-act="go" data-arg="summary">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 20v-7M12 20V5M19 20v-10"/></svg>Итоги
+      </button>
+      <button class="tool" data-act="go" data-arg="archive">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="5" rx="1.5"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9M10 13h4"/></svg>Архив
+      </button>
+      <button class="tool" data-act="go" data-arg="settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h9M17 6h3M4 12h3M11 12h9M4 18h11M19 18h1"/><circle cx="15" cy="6" r="2"/><circle cx="9" cy="12" r="2"/><circle cx="17" cy="18" r="2"/></svg>Настройки
+      </button>
+    </nav>
+  </header>
+  <button class="card result" id="resultCard" data-act="go" data-arg="summary"></button>
+  <div class="card" id="balances"></div>
+  <h2 class="sect">Операции за месяц</h2>
+  <div id="opsList"></div>
+  <div class="actionbar">
+    <button class="btn-big exp" data-act="new" data-arg="expense">− Расход</button>
+    <button class="btn-big inc" data-act="new" data-arg="income">+ Доход</button>
+    <button class="btn-tr" data-act="new" data-arg="transfer" aria-label="Перевод"><b>⇄</b>Перевод</button>
+  </div>
+</section>
+
+<!-- Расход / доход / перевод, итоги, архив, настройки (заполняются из JS) -->
+<section class="screen" id="s-form"></section>
+<section class="screen" id="s-summary"></section>
+<section class="screen" id="s-archive"></section>
+<section class="screen" id="s-settings"></section>
+
+<div class="dlg" id="dialog" hidden></div>
+<div class="toast" id="toast" role="status"></div>
+<input type="file" id="importFile" class="vh" tabindex="-1" aria-hidden="true">
+
+<script>
+(() => {
+'use strict';
+
+// ===== Проверка смены месяца =====
+// Для теста впишите сюда дату, например '2026-10-01', либо откройте страницу
+// с параметром ?today=2026-10-01. В обычной работе здесь должно быть null.
+const TEST_TODAY = null;
+
+const STORE_KEY = 'budget.v1';
+const CARDS = [
+  { id: 'sber', name: 'Сбер', letter: 'С' },
+  { id: 'tbank', name: 'Т-Банк', letter: 'Т' },
+  { id: 'raif', name: 'Райф', letter: 'Р' },
+];
+const CARD_IDS = CARDS.map((c) => c.id);
+const OTHER = 'Прочее';
+const DEFAULT_CATEGORIES = [
+  'Продукты', 'Кафе и рестораны', 'Машина', 'Бытовые покупки', 'Одежда',
+  'Аптека', 'Подписки', 'Связь и интернет', 'Спорт', 'Досуг и развлечения',
+  'Подарки', 'ЖКХ', OTHER,
+];
+const MONTHS = ['Январь', 'Февраль', 'Март', 'Апрель', 'Май', 'Июнь', 'Июль', 'Август', 'Сентябрь', 'Октябрь', 'Ноябрь', 'Декабрь'];
+const MONTHS_GEN = ['января', 'февраля', 'марта', 'апреля', 'мая', 'июня', 'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря'];
+const MONTHS_SHORT = ['янв', 'фев', 'мар', 'апр', 'мая', 'июн', 'июл', 'авг', 'сен', 'окт', 'ноя', 'дек'];
+
+const ICON = {
+  back: '<svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  up: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  del: '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>',
+};
+
+const $ = (sel) => document.querySelector(sel);
+const $$ = (sel) => document.querySelectorAll(sel);
+const esc = (s) => String(s).replace(/[&<>"']/g, (ch) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
+const pad = (n) => String(n).padStart(2, '0');
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+const cardName = (id) => (CARDS.find((c) => c.id === id) || { name: '?' }).name;
+
+// ---------- Даты (только локальное время устройства) ----------
+
+function testDate() {
+  let q = null;
+  try { q = new URLSearchParams(location.search).get('today'); } catch (e) { /* ignore */ }
+  const s = q || TEST_TODAY;
+  return isDateStr(s) ? s : null;
+}
+function todayStr() {
+  const t = testDate();
+  if (t) return t;
+  const d = new Date();
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+function isMonthKey(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(s); }
+function isDateStr(s) { return typeof s === 'string' && /^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(s); }
+const monthOf = (ds) => ds.slice(0, 7);
+const ym = (key) => key.split('-').map(Number);
+function monthTitle(key) { const [y, m] = ym(key); return `${MONTHS[m - 1]} ${y}`; }
+function lastDay(key) { const [y, m] = ym(key); return `${key}-${pad(new Date(y, m, 0).getDate())}`; }
+function shortDate(ds) { const [, m, d] = ds.split('-').map(Number); return `${d} ${MONTHS_SHORT[m - 1]}`; }
+function defaultDate() {
+  const t = todayStr();
+  if (monthOf(t) === state.month) return t;
+  return t < state.month ? `${state.month}-01` : lastDay(state.month);
+}
+
+// ---------- Деньги: храним в копейках (целые числа) ----------
+
+const NBSP = ' ';
+const group = (digits, sep) => digits.replace(/\B(?=(\d{3})+(?!\d))/g, sep);
+function fmt(k) {
+  const neg = k < 0;
+  k = Math.abs(k);
+  const r = Math.floor(k / 100), c = k % 100;
+  return (neg ? '−' : '') + group(String(r), NBSP) + (c ? ',' + pad(c) : '') + NBSP + '₽';
+}
+const fmtSigned = (k) => (k > 0 ? '+' : '') + fmt(k);
+function toInput(k) {
+  if (k == null) return '';
+  const neg = k < 0;
+  k = Math.abs(k);
+  const r = Math.floor(k / 100), c = k % 100;
+  return (neg ? '-' : '') + group(String(r), ' ') + (c ? ',' + pad(c) : '');
+}
+function parseMoney(s, allowNeg) {
+  s = String(s || '').replace(/[\s  ]/g, '').replace(/[−–]/g, '-').replace(',', '.');
+  let neg = false;
+  if (allowNeg && s.startsWith('-')) { neg = true; s = s.slice(1); }
+  if (s.endsWith('.')) s = s.slice(0, -1);
+  if (!/^\d+(\.\d{1,2})?$/.test(s)) return null;
+  const [r, c = ''] = s.split('.');
+  const v = Number(r) * 100 + Number((c + '00').slice(0, 2));
+  if (!Number.isSafeInteger(v)) return null;
+  return neg ? -v : v;
+}
+// Живое форматирование поля суммы: «12 345,50»
+function moneyText(v, allowNeg) {
+  v = String(v).replace(/[−–]/g, '-');
+  const neg = allowNeg && v.trim().startsWith('-');
+  v = v.replace(/\./g, ',').replace(/[^\d,]/g, '');
+  const i = v.indexOf(',');
+  let int = i < 0 ? v : v.slice(0, i);
+  const dec = i < 0 ? null : v.slice(i + 1).replace(/,/g, '').slice(0, 2);
+  int = int.replace(/^0+(?=\d)/, '').slice(0, 10);
+  if (dec !== null && int === '') int = '0';
+  return (neg ? '-' : '') + group(int, ' ') + (dec === null ? '' : ',' + dec);
+}
+function onMoneyInput(el) {
+  const pos = el.selectionStart == null ? el.value.length : el.selectionStart;
+  const before = el.value.slice(0, pos).replace(/[^\d,.\-−]/g, '').length;
+  const nv = moneyText(el.value, el.dataset.neg === '1');
+  if (nv === el.value) return;
+  el.value = nv;
+  let p = 0, n = 0;
+  while (p < nv.length && n < before) { if (nv[p] !== ' ') n++; p++; }
+  try { el.setSelectionRange(p, p); } catch (e) { /* ignore */ }
+}
+
+// ---------- Данные ----------
+
+let state;
+
+function freshState() {
+  return { v: 1, month: null, start: null, suggest: null, ops: [], categories: DEFAULT_CATEGORIES.slice(), archive: [] };
+}
+function normBalances(b) {
+  if (!b || typeof b !== 'object') return null;
+  const r = {};
+  for (const id of CARD_IDS) {
+    if (!Number.isSafeInteger(b[id])) return null;
+    r[id] = b[id];
+  }
+  return r;
+}
+function normOp(o) {
+  if (!o || typeof o !== 'object' || !Number.isSafeInteger(o.amount) || o.amount <= 0 || !isDateStr(o.date)) return null;
+  const op = { id: String(o.id || uid()), type: o.type, amount: o.amount, date: o.date, ts: Number(o.ts) || 0 };
+  if (o.type === 'expense' || o.type === 'income') {
+    if (!CARD_IDS.includes(o.card)) return null;
+    op.card = o.card;
+    if (o.type === 'expense') op.category = String(o.category || OTHER);
+  } else if (o.type === 'transfer') {
+    if (!CARD_IDS.includes(o.from) || !CARD_IDS.includes(o.to) || o.from === o.to) return null;
+    op.from = o.from;
+    op.to = o.to;
+  } else return null;
+  return op;
+}
+function normArchive(a) {
+  if (!a || !isMonthKey(a.month) || !Number.isSafeInteger(a.income) || !Number.isSafeInteger(a.expense)) return null;
+  const cats = (Array.isArray(a.categories) ? a.categories : [])
+    .filter((c) => c && typeof c.name === 'string' && Number.isSafeInteger(c.amount))
+    .map((c) => ({ name: c.name, amount: c.amount }))
+    .sort((x, y) => y.amount - x.amount);
+  return {
+    month: a.month, income: a.income, expense: a.expense, result: a.income - a.expense,
+    categories: cats, start: normBalances(a.start), end: normBalances(a.end),
+  };
+}
+// Проверка и нормализация данных (при загрузке и импорте)
+function normalizeState(d) {
+  if (d && d.data && typeof d.data === 'object') d = d.data; // формат файла экспорта
+  if (!d || typeof d !== 'object' || !Array.isArray(d.ops) || !Array.isArray(d.categories) || !Array.isArray(d.archive)) {
+    throw new Error('Файл не похож на резервную копию этого приложения.');
+  }
+  const s = freshState();
+  s.month = isMonthKey(d.month) ? d.month : null;
+  s.start = normBalances(d.start);
+  s.suggest = normBalances(d.suggest);
+  const cats = [];
+  for (const c of d.categories) {
+    const n = String(c == null ? '' : c).replace(/\s+/g, ' ').trim().slice(0, 40);
+    if (n && n !== OTHER && !cats.some((x) => x.toLowerCase() === n.toLowerCase())) cats.push(n);
+  }
+  cats.push(OTHER);
+  s.categories = cats;
+  s.ops = d.ops.map(normOp).filter(Boolean);
+  const seen = new Set();
+  for (const a of d.archive.map(normArchive).filter(Boolean)) {
+    if (seen.has(a.month)) continue;
+    seen.add(a.month);
+    s.archive.push(a);
+  }
+  s.archive.sort((x, y) => x.month.localeCompare(y.month));
+  const skipped = (d.ops.length - s.ops.length) + (d.archive.length - s.archive.length);
+  return { state: s, skipped };
+}
+function loadState() {
+  let raw = null;
+  try { raw = localStorage.getItem(STORE_KEY); } catch (e) { /* ignore */ }
+  if (!raw) return freshState();
+  try {
+    return normalizeState(JSON.parse(raw)).state;
+  } catch (e) {
+    // Не теряем повреждённые данные: откладываем их в отдельный ключ
+    try { localStorage.setItem(STORE_KEY + '.broken-' + Date.now(), raw); } catch (e2) { /* ignore */ }
+    return freshState();
+  }
+}
+function save() {
+  try {
+    localStorage.setItem(STORE_KEY, JSON.stringify(state));
+    return true;
+  } catch (e) {
+    dialog({ title: 'Не удалось сохранить', text: String(e && e.message || e), cancel: null });
+    return false;
+  }
+}
+
+// ---------- Расчёты ----------
+
+function monthStats(ops) {
+  let income = 0, expense = 0;
+  const byCat = new Map();
+  for (const o of ops) {
+    if (o.type === 'income') income += o.amount;
+    else if (o.type === 'expense') {
+      expense += o.amount;
+      byCat.set(o.category, (byCat.get(o.category) || 0) + o.amount);
+    }
+  }
+  const categories = [...byCat].map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount || a.name.localeCompare(b.name, 'ru'));
+  return { income, expense, result: income - expense, categories };
+}
+function balances(start, ops) {
+  const b = {};
+  for (const id of CARD_IDS) b[id] = start ? start[id] : 0;
+  for (const o of ops) {
+    if (o.type === 'income') b[o.card] += o.amount;
+    else if (o.type === 'expense') b[o.card] -= o.amount;
+    else if (o.type === 'transfer') { b[o.from] -= o.amount; b[o.to] += o.amount; }
+  }
+  return b;
+}
+function resultInfo(r) {
+  if (r > 0) return { cls: 'pos', text: 'Сэкономил ' + fmt(r) };
+  if (r < 0) return { cls: 'neg', text: 'В минусе ' + fmt(-r) };
+  return { cls: '', text: 'Итог ' + fmt(0) };
+}
+// Категории для формы расхода: 3 самые частые за месяц, затем остальные по порядку, «Прочее» — последняя
+function categoryOrder(extra) {
+  const cats = state.categories;
+  const counts = new Map();
+  for (const o of state.ops) if (o.type === 'expense') counts.set(o.category, (counts.get(o.category) || 0) + 1);
+  const top = cats.filter((c) => c !== OTHER && counts.has(c))
+    .sort((a, b) => counts.get(b) - counts.get(a) || cats.indexOf(a) - cats.indexOf(b))
+    .slice(0, 3);
+  const list = [...top, ...cats.filter((c) => !top.includes(c))];
+  // Категория старой операции, которую уже удалили из настроек
+  if (extra && !list.includes(extra)) list.splice(list.length - 1, 0, extra);
+  return list;
+}
+
+// ---------- Смена месяца ----------
+
+function addToArchive(e) {
+  const old = state.archive.find((a) => a.month === e.month);
+  if (!old) {
+    state.archive.push(e);
+  } else {
+    old.income += e.income;
+    old.expense += e.expense;
+    old.result = old.income - old.expense;
+    const m = new Map(old.categories.map((c) => [c.name, c.amount]));
+    for (const c of e.categories) m.set(c.name, (m.get(c.name) || 0) + c.amount);
+    old.categories = [...m].map(([name, amount]) => ({ name, amount })).sort((a, b) => b.amount - a.amount);
+    old.start = old.start || e.start;
+    old.end = e.end || old.end;
+  }
+  state.archive.sort((a, b) => a.month.localeCompare(b.month));
+}
+// Возвращает true, если начался новый месяц и данные были перенесены в архив
+function checkMonth() {
+  const cur = monthOf(todayStr());
+  if (!state.month) { state.month = cur; save(); return false; }
+  if (cur <= state.month) return false;
+
+  const end = state.start ? balances(state.start, state.ops) : null;
+  const byMonth = new Map();
+  const keep = [];
+  for (const o of state.ops) {
+    const m = monthOf(o.date);
+    if (m < cur) {
+      if (!byMonth.has(m)) byMonth.set(m, []);
+      byMonth.get(m).push(o);
+    } else keep.push(o);
+  }
+  // В архив попадают только месяцы, в которых были операции
+  for (const [m, ops] of byMonth) {
+    const own = m === state.month;
+    addToArchive({ month: m, ...monthStats(ops), start: own ? state.start : null, end: own ? end : null });
+  }
+  if (end) state.suggest = end; // подсказка для «Баланса на 1 число»
+  state.ops = keep;
+  state.start = null;
+  state.month = cur;
+  save();
+  return true;
+}
+
+// ---------- Навигация ----------
+
+function show(id) {
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  $$('.screen').forEach((s) => s.classList.toggle('active', s.id === id));
+  window.scrollTo(0, 0);
+}
+function goTo(name) {
+  if (!state.start) return renderStart(false); // без стартовых балансов дальше не пускаем
+  if (name === 'summary') return renderSummary(null);
+  if (name === 'archive') return renderArchive();
+  if (name === 'settings') return renderSettings();
+  renderMain();
+  show('s-main');
+}
+
+// ---------- Экраны ----------
+
+const badge = (id) => `<span class="badge ${id}">${(CARDS.find((c) => c.id === id) || { letter: '?' }).letter}</span>`;
+const balRow = (c, v) => `<div class="bal-row">${badge(c.id)}<span class="bal-name">${c.name}</span><span class="bal-val ${v < 0 ? 'neg' : ''}">${fmt(v)}</span></div>`;
+const backBtn = (to) => `<button class="back" data-act="go" data-arg="${to}" aria-label="Назад">${ICON.back}</button>`;
+
+function renderStart(edit) {
+  const vals = edit ? state.start : state.suggest;
+  const [y, m] = ym(state.month);
+  const firstRun = !edit && !state.suggest && !state.archive.length;
+  let lead;
+  if (edit) lead = `Остатки на картах на 1 ${MONTHS_GEN[m - 1]} ${y}. Все балансы за месяц пересчитаются.`;
+  else lead = `${monthTitle(state.month)}. Введите, сколько денег было на картах 1 ${MONTHS_GEN[m - 1]}.`
+    + (firstRun ? ' Если начинаете не с начала месяца — введите текущие остатки.' : '');
+  $('#s-start').innerHTML = `
+    <header class="top">${edit ? backBtn('settings') : ''}<h1>Баланс на 1 число</h1></header>
+    <p class="lead">${lead}</p>
+    ${CARDS.map((c) => `
+      <label class="field">${badge(c.id)}<span class="fname">${c.name}</span>
+        <input class="money" data-neg="1" id="st-${c.id}" inputmode="decimal" autocomplete="off" placeholder="0" value="${vals ? toInput(vals[c.id]) : ''}">
+        <span class="cur">₽</span>
+      </label>`).join('')}
+    ${!edit && state.suggest ? '<p class="hint">Подставлены расчётные остатки на конец прошлого месяца — проверьте и при необходимости исправьте.</p>' : ''}
+    <div class="err" id="stErr"></div>
+    <button class="btn-primary" data-act="saveStart" data-arg="${edit ? 'edit' : ''}">${edit ? 'Сохранить' : 'Начать месяц'}</button>
+    ${edit ? '' : '<label class="btn-link" for="importFile">Восстановить из резервной копии</label>'}`;
+  show('s-start');
+}
+function saveStart(edit) {
+  const vals = {};
+  for (const c of CARDS) {
+    const inp = $('#st-' + c.id);
+    const raw = inp.value.trim();
+    const v = raw === '' ? null : parseMoney(raw, true);
+    if (v === null) {
+      $('#stErr').textContent = raw === '' ? `Введите баланс карты ${c.name} (можно 0)` : `Неверная сумма: ${c.name}`;
+      inp.focus();
+      return;
+    }
+    vals[c.id] = v;
+  }
+  state.start = vals;
+  if (!edit) state.suggest = null;
+  if (!save()) return;
+  goTo(edit ? 'settings' : 'main');
+  toast(edit ? 'Балансы обновлены' : 'Месяц начат');
+}
+
+function opRow(o) {
+  let icon, title, sub, amt, cls;
+  if (o.type === 'transfer') {
+    icon = '<span class="badge tr">⇄</span>';
+    title = 'Перевод';
+    sub = `${cardName(o.from)} → ${cardName(o.to)}`;
+    amt = fmt(o.amount);
+    cls = 'tr';
+  } else {
+    icon = badge(o.card);
+    title = o.type === 'expense' ? esc(o.category) : 'Доход';
+    sub = cardName(o.card);
+    amt = (o.type === 'expense' ? '−' : '+') + fmt(o.amount);
+    cls = o.type === 'income' ? 'pos' : '';
+  }
+  return `<button class="op" data-act="op" data-arg="${esc(o.id)}">${icon}
+    <span class="op-main"><span class="op-title">${title}</span><span class="op-sub">${sub} · ${shortDate(o.date)}</span></span>
+    <span class="op-amt ${cls}">${amt}</span></button>`;
+}
+function renderMain() {
+  const st = monthStats(state.ops);
+  const bal = balances(state.start, state.ops);
+  const total = CARD_IDS.reduce((s, id) => s + bal[id], 0);
+  const res = resultInfo(st.result);
+  $('#mainTitle').textContent = monthTitle(state.month);
+  $('#resultCard').innerHTML = `
+    <span class="res-label">Итог месяца</span>
+    <span class="res-value ${res.cls}">${res.text}</span>
+    <span class="res-sub"><span>Доходы <b class="pos">${fmt(st.income)}</b></span><span>Расходы <b class="neg">${fmt(st.expense)}</b></span></span>
+    <span class="more">Расходы по категориям ›</span>`;
+  $('#balances').innerHTML = CARDS.map((c) => balRow(c, bal[c.id])).join('')
+    + `<div class="bal-row total"><span class="bal-name">Всего</span><span class="bal-val ${total < 0 ? 'neg' : ''}">${fmt(total)}</span></div>`;
+  const ops = state.ops.slice().sort((a, b) => b.date.localeCompare(a.date) || b.ts - a.ts);
+  $('#opsList').innerHTML = ops.length
+    ? `<div class="list">${ops.map(opRow).join('')}</div>`
+    : '<div class="list empty">Операций пока нет.<br>Нажмите «−&nbsp;Расход» или «+&nbsp;Доход».</div>';
+}
+
+// Форма операции: расход / доход / перевод
+let form = null;
+
+function openForm(type, op) {
+  const edit = !!op;
+  form = {
+    type, id: edit ? op.id : null,
+    category: edit && op.category || null, card: edit && op.card || null,
+    from: edit && op.from || null, to: edit && op.to || null,
+  };
+  const names = { expense: 'расход', income: 'доход', transfer: 'перевод' };
+  const picker = (field) => `<div class="cards3">${CARDS.map((c) =>
+    `<button class="cardbtn" data-act="pick" data-field="${field}" data-arg="${c.id}">${badge(c.id)}<span>${c.name}</span></button>`).join('')}</div>`;
+  let body = '';
+  if (type === 'expense') {
+    body += `<div class="lbl">Категория</div><div class="chips">${categoryOrder(form.category).map((c) =>
+      `<button class="chip" data-act="pick" data-field="category" data-arg="${esc(c)}">${esc(c)}</button>`).join('')}</div>`;
+  }
+  body += type === 'transfer'
+    ? `<div class="lbl">С карты</div>${picker('from')}<div class="lbl">На карту</div>${picker('to')}`
+    : `<div class="lbl">Карта</div>${picker('card')}`;
+
+  $('#s-form').innerHTML = `
+    <header class="top">${backBtn('main')}<h1>${edit ? 'Изменить' : 'Новый'} ${names[type]}</h1></header>
+    <label class="amount-box">
+      <input id="fAmount" class="amount money" inputmode="decimal" autocomplete="off" placeholder="0" value="${edit ? toInput(op.amount) : ''}">
+      <span class="cur">₽</span>
+    </label>
+    <div class="row-date"><span>Дата</span>
+      <input type="date" id="fDate" min="${state.month}-01" max="${lastDay(state.month)}" value="${edit ? op.date : defaultDate()}">
+    </div>
+    ${body}
+    <div class="err" id="fErr"></div>
+    <button class="btn-primary" data-act="save">Сохранить</button>
+    ${edit ? '<button class="btn-del" data-act="del">Удалить операцию</button>' : ''}`;
+  syncForm();
+  show('s-form');
+  // Фокус синхронно в обработчике нажатия — только так iOS сразу откроет клавиатуру
+  if (!edit) $('#fAmount').focus();
+}
+function syncForm() {
+  $$('#s-form [data-act="pick"]').forEach((b) => {
+    const f = b.dataset.field;
+    b.classList.toggle('sel', form[f] === b.dataset.arg);
+    if (f === 'to') b.disabled = form.from === b.dataset.arg;
+  });
+  $('#fErr').textContent = '';
+}
+function pick(el) {
+  const f = el.dataset.field;
+  form[f] = el.dataset.arg;
+  if (f === 'from' && form.to === form.from) form.to = null;
+  syncForm();
+}
+function saveForm() {
+  const f = form;
+  const amount = parseMoney($('#fAmount').value);
+  const date = $('#fDate').value;
+  const fail = (msg) => { $('#fErr').textContent = msg; };
+  if (!amount) { fail('Введите сумму'); $('#fAmount').focus(); return; }
+  if (!date) return fail('Укажите дату');
+  if (monthOf(date) !== state.month) return fail(`Дата должна быть в пределах месяца: ${monthTitle(state.month)}`);
+  if (f.type === 'expense' && !f.category) return fail('Выберите категорию');
+  if (f.type !== 'transfer' && !f.card) return fail('Выберите карту');
+  if (f.type === 'transfer') {
+    if (!f.from) return fail('Выберите, с какой карты');
+    if (!f.to) return fail('Выберите, на какую карту');
+    if (f.from === f.to) return fail('Карты должны быть разными');
+  }
+  const old = f.id ? state.ops.find((o) => o.id === f.id) : null;
+  const op = { id: old ? old.id : uid(), type: f.type, amount, date, ts: old ? old.ts : Date.now() };
+  if (f.type === 'transfer') { op.from = f.from; op.to = f.to; }
+  else {
+    op.card = f.card;
+    if (f.type === 'expense') op.category = f.category;
+  }
+  if (old) state.ops[state.ops.indexOf(old)] = op;
+  else state.ops.push(op);
+  if (!save()) return;
+  goTo('main');
+  toast(old ? 'Изменения сохранены' : 'Сохранено');
+}
+async function deleteOp() {
+  if (!form || !form.id) return;
+  const ok = await dialog({ title: 'Удалить операцию?', text: 'Это действие нельзя отменить.', ok: 'Удалить', danger: true });
+  if (!ok) return;
+  state.ops = state.ops.filter((o) => o.id !== form.id);
+  save();
+  goTo('main');
+  toast('Операция удалена');
+}
+
+// Итоги месяца (текущего или из архива)
+function renderSummary(archMonth) {
+  const d = archMonth
+    ? state.archive.find((a) => a.month === archMonth)
+    : { month: state.month, ...monthStats(state.ops) };
+  if (!d) return renderArchive();
+  const r = d.income - d.expense;
+  const res = resultInfo(r);
+  const cats = d.categories.length
+    ? d.categories.map((c) => {
+      const pct = d.expense ? c.amount / d.expense * 100 : 0;
+      const pctText = pct > 0 && pct < 1 ? '<1%' : Math.round(pct) + '%';
+      return `<div class="catrow">
+        <div class="catline"><span class="n">${esc(c.name)}</span><b>${fmt(c.amount)}</b><span class="p">${esc(pctText)}</span></div>
+        <div class="bar"><i style="width:${Math.max(pct, 0.5).toFixed(2)}%"></i></div></div>`;
+    }).join('')
+    : '<div class="empty">Расходов нет</div>';
+  $('#s-summary').innerHTML = `
+    <header class="top">${backBtn(archMonth ? 'archive' : 'main')}<h1>${monthTitle(d.month)}</h1></header>
+    <div class="card">
+      <div class="res-label">${archMonth ? 'Итог месяца (архив)' : 'Итог месяца'}</div>
+      <div class="res-value ${res.cls}">${res.text}</div>
+      <div class="stat"><span>Доходы</span><b class="pos">${fmt(d.income)}</b></div>
+      <div class="stat"><span>Расходы</span><b class="neg">${fmt(d.expense)}</b></div>
+      <div class="stat"><span>Результат</span><b class="${res.cls}">${fmtSigned(r)}</b></div>
+    </div>
+    <h2 class="sect">Расходы по категориям</h2>
+    <div class="card">${cats}</div>
+    ${archMonth && d.end ? `<h2 class="sect">Остатки на конец месяца</h2><div class="card">${CARDS.map((c) => balRow(c, d.end[c.id])).join('')}</div>` : ''}`;
+  show('s-summary');
+}
+
+function renderArchive() {
+  const list = state.archive.slice().sort((a, b) => b.month.localeCompare(a.month));
+  $('#s-archive').innerHTML = `
+    <header class="top">${backBtn('main')}<h1>Архив</h1></header>
+    ${list.length ? `<div class="list">${list.map((a) => {
+      const r = a.income - a.expense;
+      return `<button class="op" data-act="archiveMonth" data-arg="${a.month}">
+        <span class="op-main"><span class="op-title">${monthTitle(a.month)}</span>
+        <span class="op-sub wrap">Доходы ${fmt(a.income)}<br>Расходы ${fmt(a.expense)}</span></span>
+        <span class="op-amt ${r > 0 ? 'pos' : r < 0 ? 'neg' : ''}">${fmtSigned(r)}</span><span class="chev">›</span></button>`;
+    }).join('')}</div>`
+    : '<div class="list empty">Архив пока пуст.<br>Итоги месяца попадут сюда автоматически, когда начнётся следующий месяц.</div>'}`;
+  show('s-archive');
+}
+
+function renderSettings() {
+  $('#s-settings').innerHTML = `
+    <header class="top">${backBtn('main')}<h1>Настройки</h1></header>
+    <h2 class="sect">Категории расходов</h2>
+    <div class="list" id="catList"></div>
+    <form class="add-row" id="addCatForm" autocomplete="off">
+      <input id="newCat" placeholder="Новая категория" maxlength="30" enterkeyhint="done">
+      <button type="submit">Добавить</button>
+    </form>
+    <h2 class="sect">Текущий месяц</h2>
+    <button class="btn-row" data-act="editStart">Изменить балансы на 1 число<span class="chev">›</span></button>
+    <h2 class="sect">Резервная копия</h2>
+    <button class="btn-row" data-act="export">Экспорт в JSON<span class="chev">›</span></button>
+    <label class="btn-row" for="importFile">Импорт из JSON<span class="chev">›</span></label>
+    <p class="hint">Данные хранятся только на этом телефоне. Время от времени делайте экспорт и сохраняйте файл в «Файлы» или iCloud Drive.</p>
+    <h2 class="sect">Опасная зона</h2>
+    <button class="btn-danger" data-act="reset">Сбросить всё</button>
+    <p class="ver">Бюджет · версия 1.0</p>`;
+  renderCats();
+  show('s-settings');
+}
+function renderCats() {
+  const cats = state.categories;
+  const last = cats.length - 2; // индекс последней перемещаемой категории (перед «Прочее»)
+  $('#catList').innerHTML = cats.map((c, i) => c === OTHER
+    ? `<div class="cat-row"><span class="n">${esc(c)}</span><span class="note">всегда последняя</span></div>`
+    : `<div class="cat-row"><span class="n">${esc(c)}</span>
+        <button class="ib" data-act="catMove" data-arg="${i}" data-dir="-1" aria-label="Выше" ${i === 0 ? 'disabled' : ''}>${ICON.up}</button>
+        <button class="ib" data-act="catMove" data-arg="${i}" data-dir="1" aria-label="Ниже" ${i === last ? 'disabled' : ''}>${ICON.down}</button>
+        <button class="ib del" data-act="catDel" data-arg="${i}" aria-label="Удалить">${ICON.del}</button></div>`).join('');
+}
+function catMove(el) {
+  const c = state.categories;
+  const i = Number(el.dataset.arg), j = i + Number(el.dataset.dir);
+  if (j < 0 || j > c.length - 2 || c[i] === OTHER) return;
+  [c[i], c[j]] = [c[j], c[i]];
+  save();
+  renderCats();
+}
+async function catDel(el) {
+  const name = state.categories[Number(el.dataset.arg)];
+  if (!name || name === OTHER) return;
+  const ok = await dialog({
+    title: `Удалить «${name}»?`,
+    text: 'Уже внесённые операции с этой категорией сохранятся и останутся в итогах.',
+    ok: 'Удалить', danger: true,
+  });
+  if (!ok) return;
+  state.categories = state.categories.filter((c) => c !== name);
+  save();
+  renderCats();
+  toast('Категория удалена');
+}
+function addCat() {
+  const inp = $('#newCat');
+  const name = inp.value.replace(/\s+/g, ' ').trim();
+  if (!name) return;
+  if (state.categories.some((c) => c.toLowerCase() === name.toLowerCase())) { toast('Такая категория уже есть'); return; }
+  state.categories.splice(state.categories.length - 1, 0, name);
+  save();
+  inp.value = '';
+  renderCats();
+  toast('Категория добавлена');
+}
+
+// ---------- Экспорт / импорт / сброс ----------
+
+async function exportData() {
+  const payload = {
+    app: 'budget-pwa', format: 1, exportedAt: new Date().toISOString(),
+    note: 'Суммы указаны в копейках', data: state,
+  };
+  const name = `budget-${todayStr()}.json`;
+  const file = new File([JSON.stringify(payload, null, 2)], name, { type: 'application/json' });
+  // На iPhone надёжнее всего «Поделиться» → «Сохранить в Файлы»
+  const touch = window.matchMedia && matchMedia('(pointer: coarse)').matches;
+  if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({ files: [file], title: name });
+      return;
+    } catch (e) {
+      if (e && e.name === 'AbortError') return;
+    }
+  }
+  const url = URL.createObjectURL(file);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10000);
+  toast('Файл сохранён');
+}
+async function importFile(file) {
+  let parsed;
+  try {
+    parsed = normalizeState(JSON.parse(await file.text()));
+  } catch (e) {
+    await dialog({
+      title: 'Не удалось импортировать',
+      text: e instanceof SyntaxError ? 'Файл повреждён или это не JSON.' : e.message,
+      cancel: null,
+    });
+    return;
+  }
+  const s = parsed.state;
+  const ok = await dialog({
+    title: 'Заменить все данные?',
+    text: `Текущие данные будут перезаписаны данными из файла.\nВ файле: операций — ${s.ops.length}, месяцев в архиве — ${s.archive.length}.`
+      + (parsed.skipped ? `\nПовреждённых записей пропущено: ${parsed.skipped}.` : ''),
+    ok: 'Заменить', danger: true,
+  });
+  if (!ok) return;
+  state = s;
+  checkMonth();
+  save();
+  goTo('main');
+  toast('Данные восстановлены');
+}
+async function resetAll() {
+  const ok1 = await dialog({
+    title: 'Сбросить всё?',
+    text: 'Будут удалены все операции, балансы, архив и настройки категорий.',
+    ok: 'Продолжить', danger: true,
+  });
+  if (!ok1) return;
+  const ok2 = await dialog({
+    title: 'Точно удалить всё?',
+    text: 'Это нельзя отменить. Если нужна копия — сначала сделайте экспорт.',
+    ok: 'Удалить всё', danger: true,
+  });
+  if (!ok2) return;
+  state = freshState();
+  checkMonth();
+  save();
+  goTo('main');
+  toast('Все данные удалены');
+}
+
+// ---------- Диалог и уведомления ----------
+
+let dialogDone = null;
+function dialog({ title, text = '', ok = 'OK', cancel = 'Отмена', danger = false }) {
+  if (dialogDone) dialogDone(false);
+  const d = $('#dialog');
+  d.innerHTML = `<div class="dlg-box" role="alertdialog" aria-modal="true">
+    <h3>${esc(title)}</h3>${text ? `<p>${esc(text)}</p>` : ''}
+    <div class="dlg-btns">${cancel ? `<button data-dlg="0">${esc(cancel)}</button>` : ''}
+    <button class="ok${danger ? ' danger' : ''}" data-dlg="1">${esc(ok)}</button></div></div>`;
+  d.hidden = false;
+  if (document.activeElement && document.activeElement.blur) document.activeElement.blur();
+  return new Promise((resolve) => {
+    dialogDone = (v) => { dialogDone = null; d.hidden = true; resolve(v); };
+  });
+}
+$('#dialog').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-dlg]');
+  if (b && dialogDone) dialogDone(b.dataset.dlg === '1');
+});
+
+let toastTimer = 0;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 1800);
+}
+
+// ---------- События ----------
+
+const actions = {
+  go: (el) => goTo(el.dataset.arg),
+  new: (el) => openForm(el.dataset.arg, null),
+  op: (el) => {
+    const o = state.ops.find((x) => x.id === el.dataset.arg);
+    if (o) openForm(o.type, o);
+  },
+  pick,
+  save: saveForm,
+  del: deleteOp,
+  saveStart: (el) => saveStart(el.dataset.arg === 'edit'),
+  archiveMonth: (el) => renderSummary(el.dataset.arg),
+  catMove,
+  catDel,
+  editStart: () => renderStart(true),
+  export: exportData,
+  reset: resetAll,
+};
+document.addEventListener('click', (e) => {
+  const el = e.target.closest('[data-act]');
+  if (!el || el.disabled) return;
+  const fn = actions[el.dataset.act];
+  if (fn) fn(el, e);
+});
+document.addEventListener('input', (e) => {
+  if (e.target.classList && e.target.classList.contains('money')) onMoneyInput(e.target);
+});
+document.addEventListener('submit', (e) => {
+  if (e.target.id === 'addCatForm') { e.preventDefault(); addCat(); }
+});
+$('#importFile').addEventListener('change', (e) => {
+  const file = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (file) importFile(file);
+});
+
+// Приложение на iPhone может неделями висеть в памяти — проверяем месяц при каждом возврате
+function onResume() {
+  if (checkMonth()) {
+    if (dialogDone) dialogDone(false);
+    goTo('main');
+  }
+}
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') onResume(); });
+window.addEventListener('pageshow', (e) => { if (e.persisted) onResume(); });
+window.addEventListener('focus', onResume);
+
+// ---------- Запуск ----------
+
+state = loadState();
+checkMonth();
+if (testDate()) {
+  const tb = $('#testbar');
+  tb.textContent = 'Тестовая дата: ' + testDate().split('-').reverse().join('.');
+  tb.hidden = false;
+  document.body.classList.add('test');
+}
+goTo('main');
+
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch((e) => console.warn('Service worker:', e));
+  });
+}
+if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
+})();
+</script>
+</body>
+</html>
